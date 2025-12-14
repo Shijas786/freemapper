@@ -33,8 +33,8 @@ struct Homography {
         // For minimal dependency and 8x8, we can use a simple swift gaussian implementation or unsafe Accelerate.
         // Given constraints, I'll write a tiny Gaussian elimination here to be "Self contained" and "Real code".
         
-        var A = P
-        var B: [Float] = pointsDst.flatMap { [$0.x, $0.y] }
+        let A = P
+        let B: [Float] = pointsDst.flatMap { [$0.x, $0.y] }
         
         guard let X = solveSystem(A: A, B: B, n: 8) else {
             return matrix_identity_float3x3

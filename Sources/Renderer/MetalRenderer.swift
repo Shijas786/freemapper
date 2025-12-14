@@ -69,17 +69,21 @@ class MetalRenderer: NSObject, MTKViewDelegate {
         
         // 3. Stencil States
         let maskWriteDesc = MTLDepthStencilDescriptor()
-        maskWriteDesc.frontFaceStencil.stencilCompareFunction = .always
-        maskWriteDesc.frontFaceStencil.stencilFailureOperation = .keep
-        maskWriteDesc.frontFaceStencil.depthFailureOperation = .keep
-        maskWriteDesc.frontFaceStencil.passOperation = .replace // Write Ref value
+        let writeStencil = MTLStencilDescriptor()
+        writeStencil.stencilCompareFunction = .always
+        writeStencil.stencilFailureOperation = .keep
+        writeStencil.depthFailureOperation = .keep
+        writeStencil.depthStencilPassOperation = .replace // Write Ref value
+        maskWriteDesc.frontFaceStencil = writeStencil
         maskWriteState = device.makeDepthStencilState(descriptor: maskWriteDesc)
         
         let maskReadDesc = MTLDepthStencilDescriptor()
-        maskReadDesc.frontFaceStencil.stencilCompareFunction = .notEqual // Draw where stencil != Ref
-        maskReadDesc.frontFaceStencil.stencilFailureOperation = .keep
-        maskReadDesc.frontFaceStencil.depthFailureOperation = .keep
-        maskReadDesc.frontFaceStencil.passOperation = .keep
+        let readStencil = MTLStencilDescriptor()
+        readStencil.stencilCompareFunction = .notEqual // Draw where stencil != Ref
+        readStencil.stencilFailureOperation = .keep
+        readStencil.depthFailureOperation = .keep
+        readStencil.depthStencilPassOperation = .keep
+        maskReadDesc.frontFaceStencil = readStencil
         maskReadState = device.makeDepthStencilState(descriptor: maskReadDesc)
     }
     
@@ -139,8 +143,6 @@ class MetalRenderer: NSObject, MTKViewDelegate {
                 // Generate Mesh Geometry from Grid
                 // Rows/Cols to Triangle Strip
                 // We need to generate UVs alongside Positions
-                
-                var vertices: [VertexIn] = []
                 
                 // Simple Tessellation for Grid
                 // For a 2x2 grid (1 Quad), we have 2 rows, 2 cols of points.
