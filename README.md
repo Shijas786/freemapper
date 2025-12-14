@@ -43,6 +43,31 @@ AuroraMapper is a production-ready, Metal-accelerated projection mapping applica
   - Layer management panel
   - Property inspector
 
+### v3 Pro (Complete MadMapper Parity)
+- ✅ **24 Procedural Generators**:
+  - **Generators**: Solid Color, Color Patterns, Grid Generator, Test Card
+  - **Materials**: Gradient Color, Strob, Shapes, Line Patterns, MadNoise, Sphere
+  - **Line Patterns**: LineRepeat, SquareArray, Siren, Dunes, Bar Code, Bricks, Clouds, Random, Noisy Barcode, Caustics, SquareWave, CubicCircles, Diagonals
+- ✅ **Complete Menu System**:
+  - **File Menu**: New/Open/Save Project, Import (Media, Image Folders, 3D Objects, Fixtures, SVG), Export (Input/Output)
+  - **View Menu**: Desktop/Fullscreen modes, Show Info, Test Pattern, Cursors, Highlighting, Zoom controls, Display modes, UI panels, Snap to Objects, Lock Movement
+  - **Output Menu**: Import/Export output setups
+  - **Tools Menu**: Arm Lasers, etc.
+- ✅ **View Controls**:
+  - Zoom to selected surface
+  - Fit to window
+  - Zoom in/out
+  - Dual View / Input / Stage modes
+  - Snap to objects
+  - Lock surfaces movement
+  - Reset locations
+- ✅ **Project Management**:
+  - New/Open/Save/Save As
+  - Collect external resources
+  - Export project bundle
+  - Reveal in Finder
+- ✅ **Keyboard Shortcuts**: Full keyboard navigation matching MadMapper
+
 
 ## Architecture
 
