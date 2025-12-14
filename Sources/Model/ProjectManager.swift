@@ -65,7 +65,7 @@ class ProjectManager: ObservableObject {
     private func loadProject(from url: URL) {
         do {
             let data = try Data(contentsOf: url)
-            let project = try JSONDecoder().decode(Project.self, from: data)
+            let _ = try JSONDecoder().decode(Project.self, from: data)
             currentProjectURL = url
             hasUnsavedChanges = false
             // Apply project settings
@@ -95,7 +95,7 @@ class ProjectManager: ObservableObject {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.begin { response in
-            if response == .OK, let url = panel.url {
+            if response == .OK, let _ = panel.url {
                 // Handle image folder
             }
         }

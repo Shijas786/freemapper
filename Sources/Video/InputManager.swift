@@ -94,7 +94,7 @@ class InputManager {
             return videoEngine?.getCurrentTexture()
         case .liveCamera:
             return liveInputManager.getCurrentTexture()
-        case .montage(let montage):
+        case .montage(_):
             // Get current time from montage manager and render
             return nil // Will be handled by montage manager
         case .testPattern, .solidColor, .proceduralGenerator:

@@ -146,7 +146,7 @@ struct TimeRuler: View {
             // Time markers
             Canvas { context, size in
                 let pixelsPerSecond = 50.0 * zoom
-                let totalWidth = duration * pixelsPerSecond
+                let _ = duration * pixelsPerSecond
                 
                 for second in 0...Int(duration) {
                     let x = CGFloat(Double(second) * pixelsPerSecond)
@@ -283,7 +283,7 @@ struct MontagePanel: View {
                 Spacer()
                 Button("+") {
                     let name = "Montage-\(montageManager.montages.count + 1)"
-                    montageManager.createMontage(name: name)
+                    let _ = montageManager.createMontage(name: name)
                 }
                 .buttonStyle(.borderless)
                 .font(.caption)
