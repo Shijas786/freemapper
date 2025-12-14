@@ -57,6 +57,11 @@ class MappingViewModel: ObservableObject {
         currentInputSource = "Solid Color"
     }
     
+    func setLiveCamera(deviceName: String) {
+        inputManager.setSource(.liveCamera(deviceName: deviceName))
+        currentInputSource = deviceName
+    }
+    
     func toggleOutput() {
         if isOutputActive {
             outputWindowController?.close()
@@ -238,6 +243,16 @@ struct ControlPanel: View {
                     }
                     .buttonStyle(.borderedProminent)
                 }
+                
+                Divider()
+                
+                // Live Inputs Section
+                LiveInputsPanel(
+                    liveInputManager: vm.inputManager.getLiveInputManager(),
+                    onSelectCamera: { deviceName in
+                        vm.setLiveCamera(deviceName: deviceName)
+                    }
+                )
                 
                 Divider()
                 
