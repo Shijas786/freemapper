@@ -2,42 +2,67 @@
 using namespace metal;
 
 struct VertexIn {
-    float2 position [[attribute(0)]]; // User-defined corner in NDC (-1 to 1)
+    float2 position [[attribute(0)]]; // Screen Space (-1 to 1)
+    float2 uv       [[attribute(1)]]; // Texture Space (0 to 1)
 };
 
 struct VertexOut {
     float4 position [[position]];
-    float2 screenPos; // Passed to frag for inverse mapping
+    float2 uv;
 };
 
 struct Uniforms {
-    float3x3 textureMatrix; // Maps Screen Space -> Texture Space (Inverse Homography)
+    float opacity;
+    float edgeSoftness; // 0.0 to 0.5
 };
 
-vertex VertexOut quadVertex(VertexIn in [[stage_in]]) {
+// -----------------------------------------------------------------------------
+// GRID WARP SHADER (Alternative to Homography)
+// This explicitly interpolates UVs across the triangle mesh.
+// This allows for "Curved" convenience by moving internal mesh points.
+// -----------------------------------------------------------------------------
+vertex VertexOut gridVertex(VertexIn in [[stage_in]]) {
     VertexOut out;
     out.position = float4(in.position, 0.0, 1.0);
-    out.screenPos = in.position; // Standard NDC
+    out.uv = in.uv; // Pass explicit UVs (no perspective divide needed if mesh is dense enough)
     return out;
 }
 
-fragment float4 quadFragment(VertexOut in [[stage_in]],
+fragment float4 gridFragment(VertexOut in [[stage_in]],
                              texture2d<float> videoTexture [[texture(0)]],
                              constant Uniforms &uniforms [[buffer(0)]]) {
     constexpr sampler s(address::clamp_to_edge, filter::linear);
     
-    // Perspective correction: Map Screen(x,y) back to Texture(u,v) using Homography
-    float3 texCoordProj = uniforms.textureMatrix * float3(in.screenPos, 1.0);
+    float4 color = videoTexture.sample(s, in.uv);
     
-    // Perspective divide
-    float2 uv = texCoordProj.xy / texCoordProj.z;
+    // EDGE BLENDING (Simple Linear Fade on edges)
+    // Calculate distance to nearest edge
+    float distL = in.uv.x;
+    float distR = 1.0 - in.uv.x;
+    float distT = in.uv.y;
+    float distB = 1.0 - in.uv.y;
     
-    // Check bounds (optional, if we render strictly inside the geometry this acts as cropping)
-    // But since we render the geometry defined by user, we should be strictly inside.
-    // However, math might drift slightly, so clamp.
+    float minDist = min(min(distL, distR), min(distT, distB));
     
-    // Flip Y if needed (AVFoundation textures are often top-down or bottom-up depending on origin)
-    // We assume standard 0..1 UV where (0,0) is top-left.
+    if (minDist < uniforms.edgeSoftness) {
+        float alpha = smoothstep(0.0, uniforms.edgeSoftness, minDist);
+        color.a *= alpha;
+    }
     
-    return videoTexture.sample(s, uv);
+    color.a *= uniforms.opacity;
+    
+    return color;
+}
+
+// -----------------------------------------------------------------------------
+// POLYGON MASK SHADER (STENCIL)
+// Renders flat color, used to write to Stencil Buffer
+// -----------------------------------------------------------------------------
+vertex float4 maskVertex(uint vertexID [[vertex_id]],
+                         constant float2 *positions [[buffer(0)]]) {
+    return float4(positions[vertexID], 0.0, 1.0);
+}
+
+fragment float4 maskFragment() {
+    return float4(1.0, 1.0, 1.0, 1.0); // Color varies, usually we just care about Stencil write
 }

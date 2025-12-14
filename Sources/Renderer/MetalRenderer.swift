@@ -5,33 +5,26 @@ class MetalRenderer: NSObject, MTKViewDelegate {
     
     let device: MTLDevice
     let commandQueue: MTLCommandQueue
-    var pipelineState: MTLRenderPipelineState?
+    var gridPipeline: MTLRenderPipelineState?
+    var maskPipeline: MTLRenderPipelineState?
+    
+    // Depth/Stencil State for Masking
+    var maskWriteState: MTLDepthStencilState? // Writes 1 to stencil
+    var maskReadState: MTLDepthStencilState?  // Reads stencil (Draw only where != 1, or == 0)
+    
     var videoEngine: VideoEngine?
     
-    // State
-    // User moves these points (in NDC -1..1)
-    var corners: [SIMD2<Float>] = [
-        SIMD2<Float>(-0.8, 0.8),  // TL
-        SIMD2<Float>(0.8, 0.8),   // TR
-        SIMD2<Float>(-0.8, -0.8), // BL
-        SIMD2<Float>(0.8, -0.8)   // BR
-    ]
+    // DATA
+    var layers: [Layer] = []
     
-    private let videoCorners: [SIMD2<Float>] = [
-        SIMD2<Float>(0, 0), // TL (Texture Space)
-        SIMD2<Float>(1, 0), // TR
-        SIMD2<Float>(0, 1), // BL
-        SIMD2<Float>(1, 1)  // BR
-    ]
+    struct GridUniforms {
+        var opacity: Float
+        var edgeSoftness: Float
+    }
     
-    private var lastTexture: MTLTexture?
-    
-    struct Uniforms {
-        var textureMatrix: simd_float3x3
-        // Padding if needed (Metal requires 16 byte alignment often, but for float3x3 inside shader it handles it if packed or similar. 
-        // Safer to use float4x4 or pad manually. float3x3 in C++ is 48 bytes (3 x float4).
-        // Let's use simdfloat3x3 directly and hope Swift/Metal alignment matches or pad.
-        // Actually best practice: pass float4x4 and ignore last row/col.
+    struct VertexIn {
+        var position: SIMD2<Float>
+        var uv: SIMD2<Float>
     }
     
     override init() {
@@ -42,26 +35,56 @@ class MetalRenderer: NSObject, MTKViewDelegate {
     }
     
     private func buildPipeline() {
-        guard let library = device.makeDefaultLibrary() else {
-            print("Failed to find default library (Shaders.metal)")
-            return
-        }
+        guard let library = device.makeDefaultLibrary() else { return }
         
-        let descriptor = MTLRenderPipelineDescriptor()
-        descriptor.label = "QuadWarpPipeline"
-        descriptor.vertexFunction = library.makeFunction(name: "quadVertex")
-        descriptor.fragmentFunction = library.makeFunction(name: "quadFragment")
-        descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+        // 1. Grid Pipeline
+        let gridDesc = MTLRenderPipelineDescriptor()
+        gridDesc.label = "Grid Pipeline"
+        gridDesc.vertexFunction = library.makeFunction(name: "gridVertex")
+        gridDesc.fragmentFunction = library.makeFunction(name: "gridFragment")
+        gridDesc.colorAttachments[0].pixelFormat = .bgra8Unorm
+        
+        // Alpha Blending
+        gridDesc.colorAttachments[0].isBlendingEnabled = true
+        gridDesc.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
+        gridDesc.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+        
+        // Stencil Support
+        gridDesc.depthAttachmentPixelFormat = .invalid // No depth needed
+        gridDesc.stencilAttachmentPixelFormat = .stencil8
+        
+        // 2. Mask Pipeline
+        let maskDesc = MTLRenderPipelineDescriptor()
+        maskDesc.label = "Mask Pipeline"
+        maskDesc.vertexFunction = library.makeFunction(name: "maskVertex")
+        maskDesc.fragmentFunction = library.makeFunction(name: "maskFragment")
+        maskDesc.colorAttachments[0].pixelFormat = .bgra8Unorm
+        maskDesc.colorAttachments[0].writeMask = [] // Don't write color, only Stencil
+        maskDesc.stencilAttachmentPixelFormat = .stencil8
         
         do {
-            pipelineState = try device.makeRenderPipelineState(descriptor: descriptor)
-        } catch {
-            print("Pipeline error: \(error)")
-        }
+            gridPipeline = try device.makeRenderPipelineState(descriptor: gridDesc)
+            maskPipeline = try device.makeRenderPipelineState(descriptor: maskDesc)
+        } catch { print("Pipeline Error: \(error)") }
+        
+        // 3. Stencil States
+        let maskWriteDesc = MTLDepthStencilDescriptor()
+        maskWriteDesc.frontFaceStencil.stencilCompareFunction = .always
+        maskWriteDesc.frontFaceStencil.stencilFailureOperation = .keep
+        maskWriteDesc.frontFaceStencil.depthFailureOperation = .keep
+        maskWriteDesc.frontFaceStencil.passOperation = .replace // Write Ref value
+        maskWriteState = device.makeDepthStencilState(descriptor: maskWriteDesc)
+        
+        let maskReadDesc = MTLDepthStencilDescriptor()
+        maskReadDesc.frontFaceStencil.stencilCompareFunction = .notEqual // Draw where stencil != Ref
+        maskReadDesc.frontFaceStencil.stencilFailureOperation = .keep
+        maskReadDesc.frontFaceStencil.depthFailureOperation = .keep
+        maskReadDesc.frontFaceStencil.passOperation = .keep
+        maskReadState = device.makeDepthStencilState(descriptor: maskReadDesc)
     }
     
-    func updateCorners(tl: SIMD2<Float>, tr: SIMD2<Float>, bl: SIMD2<Float>, br: SIMD2<Float>) {
-        corners = [tl, tr, bl, br]
+    func updateLayers(_ newLayers: [Layer]) {
+        self.layers = newLayers
     }
     
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
@@ -69,68 +92,92 @@ class MetalRenderer: NSObject, MTKViewDelegate {
     func draw(in view: MTKView) {
         guard let drawable = view.currentDrawable,
               let descriptor = view.currentRenderPassDescriptor,
-              let pipeline = pipelineState,
-              let commandBuffer = commandQueue.makeCommandBuffer() else {
-            return
-        }
+              let commandBuffer = commandQueue.makeCommandBuffer(),
+              let gridPSO = gridPipeline,
+              let maskPSO = maskPipeline else { return }
         
-        // 1. Get Texture
-        if let tex = videoEngine?.getCurrentTexture() {
-            lastTexture = tex
-        }
-        
-        guard let texture = lastTexture else { return } // Wait for first frame
-        
-        // 2. Compute Homography: Screen (NDC) -> Texture (0..1)
-        // Note: Our corners are in NDC (-1..1).
-        // The texture space is (0..1).
-        // But the shader logic: "in.screenPos" is passed as varying.
-        // We want matrix M such that M * screenPos = texCoord.
-        
-        // Problem: NDC is -1 to 1.
-        // We passed these corners directly to 'position'.
-        // So the rasterizer generates pixels. 'in.screenPos' is the interpolated position.
-        // We need the matrix to map *User Corner N* (NDC) -> *Video Corner N* (0..1).
-        
-        let H = Homography.compute(src: corners, dst: videoCorners)
-        
-        // Metal buffer packing: float3x3 stride is usually 16 bytes per column vector (float3). 
-        // 3 * 16 = 48 bytes.
-        // Swift Matrix 3x3 alignment might strictly match?
-        // Let's copy carefully.
-        
-        var uniforms = Uniforms(textureMatrix: H)
+        // Need Stencil Load Action Clear
+        descriptor.stencilAttachment.loadAction = .clear
+        descriptor.stencilAttachment.storeAction = .dontCare
+        descriptor.stencilAttachment.clearStencil = 0
         
         let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor)!
-        encoder.setRenderPipelineState(pipeline)
         
-        // Draw Mesh
-        // Using `setVertexBytes` for small data is fast and easy (avoid managing buffers for V1)
-        // 4 Vertices. Triangle Strip.
-        // Order: TL, TR, BL, BR for Strip?
-        // Strip: 0(TL), 1(TR), 2(BL), 3(BR) -> Creates (0,1,2) and (2,1,3)
-        // Correct Strip Order: TL, BL, TR, BR ? No.
-        // Standard Strip: V0, V1, V2 -> T1. V1, V2, V3 -> T2 (winding order matters).
-        // Let's just use Triangle Primitive 2 triangles: (0,1,2), (2,1,3).
+        // --- PASS 1: RENDER MASKS ---
+        let maskLayers = layers.filter { $0.isVisible && $0.type == .mask }
+        if !maskLayers.isEmpty {
+            encoder.setRenderPipelineState(maskPSO)
+            encoder.setDepthStencilState(maskWriteState)
+            encoder.setStencilReferenceValue(1) // Write 1s
+            
+            for mask in maskLayers {
+                // Triangulate Polygon Fan (Center + Points) or just Triangle Strip?
+                // For simplicity v2: Treats control points as a raw triangle list or strip.
+                // Assuming simple convex shapes (Triangle Fan-able) or user provides triangles.
+                // Let's assume GL_TRIANGLE_STRIP behavior for the points.
+                let pts = mask.controlPoints
+                if pts.count >= 3 {
+                    encoder.setVertexBytes(pts, length: pts.count * MemoryLayout<SIMD2<Float>>.stride, index: 0)
+                    encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: pts.count)
+                }
+            }
+        }
         
-        let vertices: [SIMD2<Float>] = [
-            corners[0], // TL
-            corners[1], // TR
-            corners[2], // BL
-            corners[2], // BL
-            corners[1], // TR
-            corners[3]  // BR
-        ]
+        // --- PASS 2: RENDER VIDEO SURFACES ---
+        let videoLayers = layers.filter { $0.isVisible && $0.type == .video }
         
-        encoder.setVertexBytes(vertices, length: vertices.count * MemoryLayout<SIMD2<Float>>.stride, index: 0)
-        
-        // Uniforms
-        encoder.setFragmentBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 0)
-        
-        // Texture
-        encoder.setFragmentTexture(texture, index: 0)
-        
-        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
+        if let videoTex = videoEngine?.getCurrentTexture() {
+            encoder.setRenderPipelineState(gridPSO)
+            // Masking Logic: Draw only where Stencil != 1 (i.e. 0). 
+            // So Masks "Cut out".
+            encoder.setDepthStencilState(maskReadState)
+            encoder.setStencilReferenceValue(1) 
+            
+            encoder.setFragmentTexture(videoTex, index: 0)
+            
+            for layer in videoLayers {
+                // Generate Mesh Geometry from Grid
+                // Rows/Cols to Triangle Strip
+                // We need to generate UVs alongside Positions
+                
+                var vertices: [VertexIn] = []
+                
+                // Simple Tessellation for Grid
+                // For a 2x2 grid (1 Quad), we have 2 rows, 2 cols of points.
+                // Iterate (row) 0..<rows-1
+                //   Iterate (col) 0..<cols
+                //     Push Current (r, c)
+                //     Push Next (r+1, c)
+                // This creates a standard strip.
+                // Need degenerate triangles to jump rows if > 1 strip? 
+                // Or just draw Primitives per strip. Let's draw prim per row.
+                
+                for r in 0..<(layer.rows - 1) {
+                    var strip: [VertexIn] = []
+                    for c in 0..<layer.cols {
+                        // Top Point
+                        let p1 = layer.controlPoints[r * layer.cols + c]
+                        let uv1 = SIMD2<Float>(Float(c) / Float(layer.cols - 1), Float(r) / Float(layer.rows - 1))
+                        
+                        // Bottom Point
+                        let p2 = layer.controlPoints[(r + 1) * layer.cols + c]
+                        let uv2 = SIMD2<Float>(Float(c) / Float(layer.cols - 1), Float(r + 1) / Float(layer.rows - 1))
+                        
+                        strip.append(VertexIn(position: p1, uv: uv1))
+                        strip.append(VertexIn(position: p2, uv: uv2))
+                    }
+                    
+                    var uniforms = GridUniforms(opacity: layer.opacity, edgeSoftness: layer.edgeSoftness)
+                    
+                    encoder.setVertexBytes(strip, length: strip.count * MemoryLayout<VertexIn>.stride, index: 0)
+                    // Must index fragment bytes consistently. In shader I put buffer(0). 
+                    // Wait, shader Grid has buffer(0) for Uniforms.
+                    encoder.setFragmentBytes(&uniforms, length: MemoryLayout<GridUniforms>.stride, index: 0)
+                    
+                    encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: strip.count)
+                }
+            }
+        }
         
         encoder.endEncoding()
         commandBuffer.present(drawable)
