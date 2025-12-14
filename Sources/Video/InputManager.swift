@@ -7,6 +7,7 @@ enum InputSource {
     case testPattern(TestPattern)
     case proceduralGenerator(GeneratorType, params: GeneratorParams?)
     case liveCamera(deviceName: String)
+    case montage(Montage)
     case solidColor(r: Float, g: Float, b: Float)
     case none
 }
@@ -16,6 +17,7 @@ class InputManager {
     private var patternGenerator: TestPatternGenerator
     private var proceduralGenerator: ProceduralGenerator
     private var liveInputManager: LiveInputManager
+    private var montageRenderer: MontageRenderer
     private let device: MTLDevice
     
     private(set) var currentSource: InputSource = .none
@@ -26,6 +28,7 @@ class InputManager {
         self.patternGenerator = TestPatternGenerator(device: device)
         self.proceduralGenerator = ProceduralGenerator(device: device)
         self.liveInputManager = LiveInputManager(device: device)
+        self.montageRenderer = MontageRenderer(device: device)
     }
     
     func setSource(_ source: InputSource) {
@@ -65,6 +68,11 @@ class InputManager {
             videoEngine = nil
             cachedPatternTexture = nil
             
+        case .montage:
+            // Montage rendering handled separately via getCurrentTexture
+            videoEngine = nil
+            cachedPatternTexture = nil
+            
         case .solidColor(let r, let g, let b):
             cachedPatternTexture = patternGenerator.generateTexture(
                 pattern: .solidColor(r: r, g: g, b: b),
@@ -86,6 +94,9 @@ class InputManager {
             return videoEngine?.getCurrentTexture()
         case .liveCamera:
             return liveInputManager.getCurrentTexture()
+        case .montage(let montage):
+            // Get current time from montage manager and render
+            return nil // Will be handled by montage manager
         case .testPattern, .solidColor, .proceduralGenerator:
             return cachedPatternTexture
         case .none:
@@ -99,6 +110,8 @@ class InputManager {
             return url.lastPathComponent
         case .liveCamera(let deviceName):
             return deviceName
+        case .montage(let montage):
+            return montage.name
         case .testPattern(let pattern):
             switch pattern {
             case .checkerboard: return "Checkerboard"
@@ -118,5 +131,9 @@ class InputManager {
     
     func getLiveInputManager() -> LiveInputManager {
         return liveInputManager
+    }
+    
+    func getMontageRenderer() -> MontageRenderer {
+        return montageRenderer
     }
 }

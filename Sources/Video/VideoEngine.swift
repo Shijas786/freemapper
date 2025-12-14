@@ -79,4 +79,17 @@ class VideoEngine: NSObject {
         }
         return nil // Return last known texture? Ideally we cache last known to avoid black flicker.
     }
+    
+    func seek(to time: Double) {
+        let cmTime = CMTime(seconds: time, preferredTimescale: 600)
+        player?.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero)
+    }
+    
+    func play() {
+        player?.play()
+    }
+    
+    func pause() {
+        player?.pause()
+    }
 }

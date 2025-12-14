@@ -19,6 +19,7 @@ class MappingViewModel: ObservableObject {
     var renderer = MetalRenderer()
     var outputWindowController: OutputWindowController?
     var inputManager: InputManager
+    var montageManager = MontageManager()
     
     init() {
         inputManager = InputManager(device: renderer.device)
