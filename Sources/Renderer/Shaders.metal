@@ -194,7 +194,7 @@ vertex VertexOut generatorVertex(uint vertexID [[vertex_id]],
 fragment float4 generatorFragment(VertexOut in [[stage_in]],
                                   constant GeneratorParams &p [[buffer(0)]]) {
     float2 uv = in.uv;
-    float2 pixel = uv * p.resolution;
+    // float2 pixel = uv * p.resolution;
     
     // Apply transformation
     float2 center = float2(0.5, 0.5);
@@ -291,7 +291,7 @@ fragment float4 generatorFragment(VertexOut in [[stage_in]],
     else if (p.type == 16) {
         float2 brick = uv * float2(p.cellsX, p.cellsY);
         brick.x += step(1.0, fmod(brick.y, 2.0)) * 0.5;
-        float2 brickId = floor(brick);
+        // float2 brickId = floor(brick);
         float2 brickUV = fract(brick);
         float mortar = step(brickUV.x, p.lineWidth) + step(brickUV.y, p.lineWidth);
         mortar = min(mortar, 1.0);
