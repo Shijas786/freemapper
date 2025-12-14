@@ -68,6 +68,32 @@ AuroraMapper is a production-ready, Metal-accelerated projection mapping applica
   - Reveal in Finder
 - ✅ **Keyboard Shortcuts**: Full keyboard navigation matching MadMapper
 
+### v4 Pro (Live Production Features)
+- ✅ **Live Camera Inputs**:
+  - Camera device discovery (MacBook Pro Camera, external cameras)
+  - Real-time video capture with AVFoundation
+  - Zero-copy Metal texture streaming
+  - Video format selection (4K, 1080p, 720p, 480p)
+  - Flip horizontal/vertical controls
+  - Color profile selection (Auto, sRGB, Display P3, Rec. 709)
+  - Keep running option for CPU management
+  - Device preview toggle
+- ✅ **Montage/Timeline System**:
+  - Timeline-based video composition
+  - Multi-track editing (4 tracks)
+  - Clip management (add, remove, trim)
+  - Frame-accurate playback
+  - Timecode display (HH:MM:SS:FF)
+  - Professional timeline UI with ruler
+  - Playback controls (play, pause, stop, step forward/back)
+  - Zoom controls (0.1x to 5x)
+  - Snap to frames
+  - Visual playhead indicator
+  - Drag to seek
+  - Frame counter
+  - Clip visualization with duration
+  - Multi-clip compositing
+
 
 ## Architecture
 
