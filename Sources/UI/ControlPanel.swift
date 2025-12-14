@@ -58,11 +58,6 @@ class MappingViewModel: ObservableObject {
         currentInputSource = "Solid Color"
     }
     
-    func setLiveCamera(deviceName: String) {
-        inputManager.setSource(.liveCamera(deviceName: deviceName))
-        currentInputSource = deviceName
-    }
-    
     func toggleOutput() {
         if isOutputActive {
             outputWindowController?.close()
@@ -247,16 +242,6 @@ struct ControlPanel: View {
                 
                 Divider()
                 
-                // Live Inputs Section
-                LiveInputsPanel(
-                    liveInputManager: vm.inputManager.getLiveInputManager(),
-                    onSelectCamera: { deviceName in
-                        vm.setLiveCamera(deviceName: deviceName)
-                    }
-                )
-                
-                Divider()
-                
                 // Resolution
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Resolution").font(.subheadline).bold()
@@ -350,7 +335,7 @@ struct ControlPanel: View {
                         panel.nameFieldStringValue = "preset.json"
                         panel.begin { response in
                             if response == .OK, let url = panel.url {
-                                vm.savePreset(to: url)
+                                 vm.savePreset(to: url)
                             }
                         }
                     }

@@ -6,7 +6,6 @@ enum InputSource {
     case video(url: URL)
     case testPattern(TestPattern)
     case proceduralGenerator(GeneratorType, params: GeneratorParams?)
-    case liveCamera(deviceName: String)
     case montage(Montage)
     case solidColor(r: Float, g: Float, b: Float)
     case none
@@ -16,7 +15,6 @@ class InputManager {
     private var videoEngine: VideoEngine?
     private var patternGenerator: TestPatternGenerator
     private var proceduralGenerator: ProceduralGenerator
-    private var liveInputManager: LiveInputManager
     private var montageRenderer: MontageRenderer
     private let device: MTLDevice
     
@@ -27,7 +25,6 @@ class InputManager {
         self.device = device
         self.patternGenerator = TestPatternGenerator(device: device)
         self.proceduralGenerator = ProceduralGenerator(device: device)
-        self.liveInputManager = LiveInputManager(device: device)
         self.montageRenderer = MontageRenderer(device: device)
     }
     
@@ -60,14 +57,6 @@ class InputManager {
             )
             videoEngine = nil
             
-        case .liveCamera(let deviceName):
-            // Find and start the camera device
-            if let device = liveInputManager.availableDevices.first(where: { $0.localizedName == deviceName }) {
-                liveInputManager.startCapture(device: device)
-            }
-            videoEngine = nil
-            cachedPatternTexture = nil
-            
         case .montage:
             // Montage rendering handled separately via getCurrentTexture
             videoEngine = nil
@@ -84,7 +73,6 @@ class InputManager {
         case .none:
             videoEngine = nil
             cachedPatternTexture = nil
-            liveInputManager.stopCapture()
         }
     }
     
@@ -92,8 +80,6 @@ class InputManager {
         switch currentSource {
         case .video:
             return videoEngine?.getCurrentTexture()
-        case .liveCamera:
-            return liveInputManager.getCurrentTexture()
         case .montage(_):
             // Get current time from montage manager and render
             return nil // Will be handled by montage manager
@@ -108,8 +94,6 @@ class InputManager {
         switch currentSource {
         case .video(let url):
             return url.lastPathComponent
-        case .liveCamera(let deviceName):
-            return deviceName
         case .montage(let montage):
             return montage.name
         case .testPattern(let pattern):
@@ -127,10 +111,6 @@ class InputManager {
         case .none:
             return "No Input"
         }
-    }
-    
-    func getLiveInputManager() -> LiveInputManager {
-        return liveInputManager
     }
     
     func getMontageRenderer() -> MontageRenderer {

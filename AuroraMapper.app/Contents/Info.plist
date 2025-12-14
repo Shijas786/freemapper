@@ -28,5 +28,9 @@
     <true/>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.graphics-design</string>
+    <key>NSCameraUsageDescription</key>
+    <string>AuroraMapper needs camera access for video input.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>AuroraMapper needs microphone access for audio reactivity features.</string>
 </dict>
 </plist>
