@@ -149,7 +149,7 @@ struct GeneratorParams {
     float2 translation;
     float rotation;
     float smooth;
-    float repeat;
+    float repeatVal;
     float3 color1;
     float3 color2;
     float bpmSync;
@@ -268,7 +268,7 @@ fragment float4 generatorFragment(VertexOut in [[stage_in]],
     // 13: Siren (Rotating gradient)
     else if (p.type == 13) {
         float angle = atan2(uv.y - 0.5, uv.x - 0.5);
-        float siren = fract((angle / 6.28318) * p.repeat + p.time * p.speed);
+        float siren = fract((angle / 6.28318) * p.repeatVal + p.time * p.speed);
         float3 color = mix(p.color1, p.color2, siren);
         return float4(color, 1.0);
     }
@@ -341,7 +341,7 @@ fragment float4 generatorFragment(VertexOut in [[stage_in]],
     else if (p.type == 22) {
         float2 cell = fmod(uv * float2(p.cellsX, p.cellsY), 1.0);
         float dist = length(cell - 0.5);
-        float circle = fract(dist * p.repeat - p.time * p.speed);
+        float circle = fract(dist * p.repeatVal - p.time * p.speed);
         circle = smoothstep(0.5, 0.5 - p.smooth, circle);
         float3 color = mix(p.color2, p.color1, circle);
         return float4(color, 1.0);

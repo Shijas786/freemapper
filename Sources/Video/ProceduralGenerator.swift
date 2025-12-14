@@ -46,7 +46,7 @@ struct GeneratorParams {
     var translation: SIMD2<Float> = SIMD2<Float>(0, 0)
     var rotation: Float = 0.0
     var smooth: Float = 0.0
-    var repeat: Float = 1.0
+    var repeatVal: Float = 1.0
     
     // Colors
     var color1: SIMD3<Float> = SIMD3<Float>(1, 1, 1)
