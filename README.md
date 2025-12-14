@@ -14,13 +14,35 @@ AuroraMapper is a production-ready, Metal-accelerated projection mapping applica
 - ✅ Save/Load mapping presets (JSON)
 - ✅ Zero-copy video pipeline (CVMetalTextureCache)
 
-### v2 (Advanced Engine)
+### v2 Pro (MadMapper-Level Features)
 - ✅ **Multi-layer compositing** - Stack multiple video surfaces and masks
 - ✅ **Mesh warping** - Convert quads to arbitrary grids (up to 10×10) for curved surfaces
 - ✅ **Polygon masking** - Cut out specific areas using custom shapes
 - ✅ **Edge blending** - Soft edges for multi-projector setups
 - ✅ **Layer opacity control** - Per-layer transparency
-- ✅ **Advanced UI** - Layer management, property inspector, mesh editor
+- ✅ **Test Pattern Generators**:
+  - Checkerboard (alignment)
+  - Grid (calibration)
+  - Color Bars (SMPTE)
+  - Gradient (testing)
+  - Solid Colors (white, black, RGB)
+- ✅ **Input Source Management**:
+  - Video files (MP4, ProRes, MOV)
+  - Test patterns
+  - Solid colors
+  - Live source switching
+- ✅ **Resolution Presets**:
+  - Full HD (1920×1080)
+  - 2K (2560×1440)
+  - 4K (3840×2160)
+  - XGA (1024×768)
+- ✅ **Professional UI**:
+  - MadMapper-inspired layout
+  - Stage preview
+  - Input source display
+  - Layer management panel
+  - Property inspector
+
 
 ## Architecture
 

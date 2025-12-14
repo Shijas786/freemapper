@@ -12,7 +12,7 @@ class MetalRenderer: NSObject, MTKViewDelegate {
     var maskWriteState: MTLDepthStencilState? // Writes 1 to stencil
     var maskReadState: MTLDepthStencilState?  // Reads stencil (Draw only where != 1, or == 0)
     
-    var videoEngine: VideoEngine?
+    var inputManager: InputManager?
     
     // DATA
     var layers: [Layer] = []
@@ -130,7 +130,7 @@ class MetalRenderer: NSObject, MTKViewDelegate {
         // --- PASS 2: RENDER VIDEO SURFACES ---
         let videoLayers = layers.filter { $0.isVisible && $0.type == .video }
         
-        if let videoTex = videoEngine?.getCurrentTexture() {
+        if let videoTex = inputManager?.getCurrentTexture() {
             encoder.setRenderPipelineState(gridPSO)
             // Masking Logic: Draw only where Stencil != 1 (i.e. 0). 
             // So Masks "Cut out".

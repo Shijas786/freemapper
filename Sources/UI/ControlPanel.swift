@@ -10,12 +10,20 @@ class MappingViewModel: ObservableObject {
     @Published var selectedLayerID: UUID?
     @Published var selectedPointIndex: Int?
     
+    // Input Management
+    @Published var currentInputSource: String = "No Input"
+    @Published var availablePatterns: [TestPattern] = [.checkerboard, .grid, .colorBars, .gradient]
+    
+    // Resolution
+    @Published var outputResolution: CGSize = CGSize(width: 1920, height: 1080)
+    
     var renderer = MetalRenderer()
     var outputWindowController: OutputWindowController?
-    var videoEngine = VideoEngine()
+    var inputManager: InputManager
     
     init() {
-        renderer.videoEngine = videoEngine
+        inputManager = InputManager(device: renderer.device)
+        renderer.inputManager = inputManager
         
         // Create default layer
         layers.append(Layer.createQuad(name: "Surface 1"))
@@ -29,9 +37,20 @@ class MappingViewModel: ObservableObject {
         panel.allowedContentTypes = [.movie, .quickTimeMovie, .mpeg4Movie]
         panel.begin { response in
             if response == .OK, let url = panel.url {
-                self.videoEngine.load(url: url)
+                self.inputManager.setSource(.video(url: url))
+                self.currentInputSource = url.lastPathComponent
             }
         }
+    }
+    
+    func setTestPattern(_ pattern: TestPattern) {
+        inputManager.setSource(.testPattern(pattern))
+        currentInputSource = inputManager.getSourceName()
+    }
+    
+    func setSolidColor(r: Float, g: Float, b: Float) {
+        inputManager.setSource(.solidColor(r: r, g: g, b: b))
+        currentInputSource = "Solid Color"
     }
     
     func toggleOutput() {
@@ -87,7 +106,6 @@ class MappingViewModel: ObservableObject {
         guard let index = layers.firstIndex(where: { $0.id == layerID }) else { return }
         guard layers[index].type == .video else { return }
         
-        // Get current bounds
         let currentPoints = layers[index].controlPoints
         guard currentPoints.count == 4 else { return }
         
@@ -96,14 +114,12 @@ class MappingViewModel: ObservableObject {
         let bl = currentPoints[2]
         let br = currentPoints[3]
         
-        // Generate grid
         var newPoints: [SIMD2<Float>] = []
         for r in 0..<rows {
             let vLerp = Float(r) / Float(rows - 1)
             for c in 0..<cols {
                 let hLerp = Float(c) / Float(cols - 1)
                 
-                // Bilinear interpolation
                 let top = tl * (1 - hLerp) + tr * hLerp
                 let bottom = bl * (1 - hLerp) + br * hLerp
                 let point = top * (1 - vLerp) + bottom * vLerp
@@ -151,29 +167,74 @@ struct ControlPanel: View {
         HSplitView {
             // Left Sidebar
             VStack(alignment: .leading, spacing: 16) {
-                Text("AuroraMapper v2").font(.title2).bold()
+                Text("AuroraMapper Pro").font(.title2).bold()
                 
                 Divider()
                 
-                // Video Section
+                // Input Section (MadMapper style)
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Video Input").font(.headline)
-                    Button("Load Video") { vm.loadVideo() }
-                        .buttonStyle(.borderedProminent)
+                    Text("Input").font(.headline)
+                    
+                    Text(vm.currentInputSource)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                    
+                    Menu("Media Sources") {
+                        Button("Load Video File") { vm.loadVideo() }
+                        
+                        Divider()
+                        
+                        Menu("Test Patterns") {
+                            Button("Checkerboard") { vm.setTestPattern(.checkerboard) }
+                            Button("Grid") { vm.setTestPattern(.grid) }
+                            Button("Color Bars") { vm.setTestPattern(.colorBars) }
+                            Button("Gradient") { vm.setTestPattern(.gradient) }
+                        }
+                        
+                        Divider()
+                        
+                        Menu("Solid Colors") {
+                            Button("White") { vm.setSolidColor(r: 1, g: 1, b: 1) }
+                            Button("Black") { vm.setSolidColor(r: 0, g: 0, b: 0) }
+                            Button("Red") { vm.setSolidColor(r: 1, g: 0, b: 0) }
+                            Button("Green") { vm.setSolidColor(r: 0, g: 1, b: 0) }
+                            Button("Blue") { vm.setSolidColor(r: 0, g: 0, b: 1) }
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                
+                Divider()
+                
+                // Resolution
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Resolution").font(.headline)
+                    Text("\(Int(vm.outputResolution.width)) × \(Int(vm.outputResolution.height))")
+                        .font(.system(.body, design: .monospaced))
+                        .foregroundColor(.secondary)
+                    
+                    Menu("Presets") {
+                        Button("1920 × 1080 (Full HD)") { vm.outputResolution = CGSize(width: 1920, height: 1080) }
+                        Button("2560 × 1440 (2K)") { vm.outputResolution = CGSize(width: 2560, height: 1440) }
+                        Button("3840 × 2160 (4K)") { vm.outputResolution = CGSize(width: 3840, height: 2160) }
+                        Button("1024 × 768 (XGA)") { vm.outputResolution = CGSize(width: 1024, height: 768) }
+                    }
+                    .buttonStyle(.bordered)
                 }
                 
                 Divider()
                 
                 // Output Section
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Output Display").font(.headline)
+                    Text("Output").font(.headline)
                     Picker("Screen", selection: $vm.selectedScreenIndex) {
                         ForEach(0..<vm.screens.count, id: \.self) { i in
                             Text(vm.screens[i].localizedName)
                         }
                     }
                     
-                    Button(vm.isOutputActive ? "Stop Output" : "Start Output") {
+                    Button(vm.isOutputActive ? "■ Stop Output" : "▶ Start Output") {
                         vm.toggleOutput()
                     }
                     .buttonStyle(.borderedProminent)
@@ -184,7 +245,7 @@ struct ControlPanel: View {
                 
                 // Layers Section
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Layers").font(.headline)
+                    Text("Surfaces").font(.headline)
                     
                     ScrollView {
                         VStack(spacing: 4) {
@@ -198,7 +259,7 @@ struct ControlPanel: View {
                     .frame(height: 150)
                     
                     HStack {
-                        Menu("Add Layer") {
+                        Menu("+ Add") {
                             Button("Video Surface") { vm.addLayer(type: .video) }
                             Button("Mask") { vm.addLayer(type: .mask) }
                         }
@@ -228,7 +289,7 @@ struct ControlPanel: View {
                 
                 // Preset Management
                 HStack {
-                    Button("Save") {
+                    Button("💾 Save") {
                         let panel = NSSavePanel()
                         panel.allowedContentTypes = [.json]
                         panel.nameFieldStringValue = "preset.json"
@@ -239,7 +300,7 @@ struct ControlPanel: View {
                         }
                     }
                     
-                    Button("Load") {
+                    Button("📂 Load") {
                         let panel = NSOpenPanel()
                         panel.allowedContentTypes = [.json]
                         panel.begin { response in
@@ -254,10 +315,26 @@ struct ControlPanel: View {
             .padding()
             .frame(minWidth: 250, maxWidth: 300)
             
-            // Editor Canvas
+            // Center: Editor Canvas
             GeometryReader { geo in
                 ZStack {
                     Color.black.opacity(0.9)
+                    
+                    // Stage Preview (like MadMapper's input preview)
+                    VStack {
+                        HStack {
+                            Text("Stage")
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.5))
+                            Spacer()
+                            Text(vm.currentInputSource)
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.5))
+                        }
+                        .padding(8)
+                        
+                        Spacer()
+                    }
                     
                     if let selectedID = vm.selectedLayerID,
                        let layer = vm.layers.first(where: { $0.id == selectedID }) {
@@ -271,7 +348,7 @@ struct ControlPanel: View {
                 }
             }
         }
-        .frame(minWidth: 1000, minHeight: 700)
+        .frame(minWidth: 1200, minHeight: 800)
     }
 }
 
@@ -284,6 +361,7 @@ struct LayerRow: View {
         HStack {
             Image(systemName: layer.type == .video ? "video.fill" : "scissors")
                 .foregroundColor(layer.type == .video ? .blue : .orange)
+                .frame(width: 20)
             
             Text(layer.name)
                 .font(.system(.body, design: .monospaced))
@@ -293,6 +371,7 @@ struct LayerRow: View {
             if !layer.isVisible {
                 Image(systemName: "eye.slash")
                     .foregroundColor(.gray)
+                    .font(.caption)
             }
         }
         .padding(8)
@@ -330,7 +409,7 @@ struct LayerProperties: View {
                 }
                 
                 VStack(alignment: .leading) {
-                    Text("Edge Softness: \(Int(layer.edgeSoftness * 100))%")
+                    Text("Edge Blend: \(Int(layer.edgeSoftness * 100))%")
                         .font(.caption)
                     Slider(value: $layer.edgeSoftness, in: 0...0.5)
                         .onChange(of: layer.edgeSoftness) { _ in onUpdate() }
@@ -338,7 +417,7 @@ struct LayerProperties: View {
                 
                 Divider()
                 
-                Text("Mesh Grid").font(.subheadline).bold()
+                Text("Mesh").font(.subheadline).bold()
                 Text("Current: \(layer.rows)×\(layer.cols)")
                     .font(.caption)
                     .foregroundColor(.secondary)
