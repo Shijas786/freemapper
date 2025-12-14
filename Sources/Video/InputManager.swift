@@ -5,6 +5,7 @@ import AVFoundation
 enum InputSource {
     case video(url: URL)
     case testPattern(TestPattern)
+    case proceduralGenerator(GeneratorType, params: GeneratorParams?)
     case solidColor(r: Float, g: Float, b: Float)
     case none
 }
@@ -12,6 +13,7 @@ enum InputSource {
 class InputManager {
     private var videoEngine: VideoEngine?
     private var patternGenerator: TestPatternGenerator
+    private var proceduralGenerator: ProceduralGenerator
     private let device: MTLDevice
     
     private(set) var currentSource: InputSource = .none
@@ -20,6 +22,7 @@ class InputManager {
     init(device: MTLDevice) {
         self.device = device
         self.patternGenerator = TestPatternGenerator(device: device)
+        self.proceduralGenerator = ProceduralGenerator(device: device)
     }
     
     func setSource(_ source: InputSource) {
@@ -42,6 +45,15 @@ class InputManager {
             )
             videoEngine = nil
             
+        case .proceduralGenerator(let type, let params):
+            cachedPatternTexture = proceduralGenerator.generateTexture(
+                type: type,
+                width: 1920,
+                height: 1080,
+                params: params
+            )
+            videoEngine = nil
+            
         case .solidColor(let r, let g, let b):
             cachedPatternTexture = patternGenerator.generateTexture(
                 pattern: .solidColor(r: r, g: g, b: b),
@@ -60,7 +72,7 @@ class InputManager {
         switch currentSource {
         case .video:
             return videoEngine?.getCurrentTexture()
-        case .testPattern, .solidColor:
+        case .testPattern, .solidColor, .proceduralGenerator:
             return cachedPatternTexture
         case .none:
             return nil
@@ -79,6 +91,8 @@ class InputManager {
             case .solidColor: return "Solid Color"
             case .gradient: return "Gradient"
             }
+        case .proceduralGenerator(let type, _):
+            return type.rawValue
         case .solidColor:
             return "Solid Color"
         case .none:

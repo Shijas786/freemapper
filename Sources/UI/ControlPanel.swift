@@ -12,7 +12,6 @@ class MappingViewModel: ObservableObject {
     
     // Input Management
     @Published var currentInputSource: String = "No Input"
-    @Published var availablePatterns: [TestPattern] = [.checkerboard, .grid, .colorBars, .gradient]
     
     // Resolution
     @Published var outputResolution: CGSize = CGSize(width: 1920, height: 1080)
@@ -46,6 +45,11 @@ class MappingViewModel: ObservableObject {
     func setTestPattern(_ pattern: TestPattern) {
         inputManager.setSource(.testPattern(pattern))
         currentInputSource = inputManager.getSourceName()
+    }
+    
+    func setGenerator(_ type: GeneratorType) {
+        inputManager.setSource(.proceduralGenerator(type, params: nil))
+        currentInputSource = type.rawValue
     }
     
     func setSolidColor(r: Float, g: Float, b: Float) {
@@ -165,41 +169,71 @@ struct ControlPanel: View {
     
     var body: some View {
         HSplitView {
-            // Left Sidebar
-            VStack(alignment: .leading, spacing: 16) {
-                Text("AuroraMapper Pro").font(.title2).bold()
+            // Left Sidebar (MadMapper-style)
+            VStack(alignment: .leading, spacing: 12) {
+                Text("AuroraMapper Pro").font(.title3).bold()
                 
                 Divider()
                 
-                // Input Section (MadMapper style)
+                // Media Instances Section
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Input").font(.headline)
+                    Text("Media Instances").font(.headline)
                     
                     Text(vm.currentInputSource)
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                     
-                    Menu("Media Sources") {
-                        Button("Load Video File") { vm.loadVideo() }
+                    Menu("📁 Media Sources") {
+                        Button("Load Video File...") { vm.loadVideo() }
                         
                         Divider()
                         
-                        Menu("Test Patterns") {
-                            Button("Checkerboard") { vm.setTestPattern(.checkerboard) }
-                            Button("Grid") { vm.setTestPattern(.grid) }
-                            Button("Color Bars") { vm.setTestPattern(.colorBars) }
-                            Button("Gradient") { vm.setTestPattern(.gradient) }
+                        // Generators
+                        Menu("⚙️ Generators") {
+                            Button("Solid Color") { vm.setGenerator(.solidColor) }
+                            Button("Color Patterns") { vm.setGenerator(.colorPatterns) }
+                            Button("Grid Generator") { vm.setGenerator(.gridGenerator) }
+                            Button("Test Card") { vm.setGenerator(.testCard) }
+                        }
+                        
+                        // Materials
+                        Menu("🎨 Materials") {
+                            Button("Gradient Color") { vm.setGenerator(.gradientColor) }
+                            Button("Strob") { vm.setGenerator(.strob) }
+                            Button("Shapes") { vm.setGenerator(.shapes) }
+                            Button("Line Patterns") { vm.setGenerator(.linePatterns) }
+                            Button("MadNoise") { vm.setGenerator(.madNoise) }
+                            Button("Sphere") { vm.setGenerator(.sphere) }
                         }
                         
                         Divider()
                         
-                        Menu("Solid Colors") {
-                            Button("White") { vm.setSolidColor(r: 1, g: 1, b: 1) }
-                            Button("Black") { vm.setSolidColor(r: 0, g: 0, b: 0) }
-                            Button("Red") { vm.setSolidColor(r: 1, g: 0, b: 0) }
-                            Button("Green") { vm.setSolidColor(r: 0, g: 1, b: 0) }
-                            Button("Blue") { vm.setSolidColor(r: 0, g: 0, b: 1) }
+                        // Line Patterns
+                        Menu("📊 Line Patterns") {
+                            Button("LineRepeat") { vm.setGenerator(.lineRepeat) }
+                            Button("SquareArray") { vm.setGenerator(.squareArray) }
+                            Button("Siren") { vm.setGenerator(.siren) }
+                            Button("Dunes") { vm.setGenerator(.dunes) }
+                            Button("Bar Code") { vm.setGenerator(.barCode) }
+                            Button("Bricks") { vm.setGenerator(.bricks) }
+                            Button("Clouds") { vm.setGenerator(.clouds) }
+                            Button("Random") { vm.setGenerator(.random) }
+                            Button("Noisy Barcode") { vm.setGenerator(.noisyBarcode) }
+                            Button("Caustics") { vm.setGenerator(.caustics) }
+                            Button("SquareWave") { vm.setGenerator(.squareWave) }
+                            Button("CubicCircles") { vm.setGenerator(.cubicCircles) }
+                            Button("Diagonals") { vm.setGenerator(.diagonals) }
+                        }
+                        
+                        Divider()
+                        
+                        // Test Patterns
+                        Menu("🔲 Test Patterns") {
+                            Button("Checkerboard") { vm.setTestPattern(.checkerboard) }
+                            Button("Grid") { vm.setTestPattern(.grid) }
+                            Button("Color Bars") { vm.setTestPattern(.colorBars) }
+                            Button("Gradient") { vm.setTestPattern(.gradient) }
                         }
                     }
                     .buttonStyle(.borderedProminent)
@@ -208,10 +242,10 @@ struct ControlPanel: View {
                 Divider()
                 
                 // Resolution
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Resolution").font(.headline)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Resolution").font(.subheadline).bold()
                     Text("\(Int(vm.outputResolution.width)) × \(Int(vm.outputResolution.height))")
-                        .font(.system(.body, design: .monospaced))
+                        .font(.system(.caption, design: .monospaced))
                         .foregroundColor(.secondary)
                     
                     Menu("Presets") {
@@ -221,34 +255,37 @@ struct ControlPanel: View {
                         Button("1024 × 768 (XGA)") { vm.outputResolution = CGSize(width: 1024, height: 768) }
                     }
                     .buttonStyle(.bordered)
+                    .font(.caption)
                 }
                 
                 Divider()
                 
-                // Output Section
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Output").font(.headline)
-                    Picker("Screen", selection: $vm.selectedScreenIndex) {
+                // Output
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Output").font(.subheadline).bold()
+                    Picker("", selection: $vm.selectedScreenIndex) {
                         ForEach(0..<vm.screens.count, id: \.self) { i in
-                            Text(vm.screens[i].localizedName)
+                            Text(vm.screens[i].localizedName).tag(i)
                         }
                     }
+                    .labelsHidden()
                     
-                    Button(vm.isOutputActive ? "■ Stop Output" : "▶ Start Output") {
+                    Button(vm.isOutputActive ? "■ Stop" : "▶ Start") {
                         vm.toggleOutput()
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(vm.isOutputActive ? .red : .green)
+                    .font(.caption)
                 }
                 
                 Divider()
                 
-                // Layers Section
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Surfaces").font(.headline)
+                // Surfaces
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Surfaces").font(.subheadline).bold()
                     
                     ScrollView {
-                        VStack(spacing: 4) {
+                        VStack(spacing: 2) {
                             ForEach(vm.layers) { layer in
                                 LayerRow(layer: layer, 
                                        isSelected: vm.selectedLayerID == layer.id,
@@ -256,26 +293,28 @@ struct ControlPanel: View {
                             }
                         }
                     }
-                    .frame(height: 150)
+                    .frame(height: 120)
                     
-                    HStack {
+                    HStack(spacing: 4) {
                         Menu("+ Add") {
                             Button("Video Surface") { vm.addLayer(type: .video) }
                             Button("Mask") { vm.addLayer(type: .mask) }
                         }
                         .buttonStyle(.bordered)
+                        .font(.caption)
                         
-                        Button("Delete", role: .destructive) {
+                        Button("Delete") {
                             vm.deleteSelectedLayer()
                         }
                         .buttonStyle(.bordered)
+                        .font(.caption)
                         .disabled(vm.selectedLayerID == nil)
                     }
                 }
                 
                 Divider()
                 
-                // Layer Properties
+                // Properties
                 if let selectedID = vm.selectedLayerID,
                    let layerIndex = vm.layers.firstIndex(where: { $0.id == selectedID }) {
                     LayerProperties(layer: $vm.layers[layerIndex], 
@@ -287,9 +326,9 @@ struct ControlPanel: View {
                 
                 Spacer()
                 
-                // Preset Management
-                HStack {
-                    Button("💾 Save") {
+                // Presets
+                HStack(spacing: 4) {
+                    Button("💾") {
                         let panel = NSSavePanel()
                         panel.allowedContentTypes = [.json]
                         panel.nameFieldStringValue = "preset.json"
@@ -299,8 +338,9 @@ struct ControlPanel: View {
                             }
                         }
                     }
+                    .help("Save Preset")
                     
-                    Button("📂 Load") {
+                    Button("📂") {
                         let panel = NSOpenPanel()
                         panel.allowedContentTypes = [.json]
                         panel.begin { response in
@@ -309,27 +349,29 @@ struct ControlPanel: View {
                             }
                         }
                     }
+                    .help("Load Preset")
                 }
                 .buttonStyle(.bordered)
+                .font(.caption)
             }
-            .padding()
-            .frame(minWidth: 250, maxWidth: 300)
+            .padding(12)
+            .frame(minWidth: 220, maxWidth: 260)
+            .background(Color(NSColor.windowBackgroundColor))
             
-            // Center: Editor Canvas
+            // Center: Stage
             GeometryReader { geo in
                 ZStack {
-                    Color.black.opacity(0.9)
+                    Color.black.opacity(0.95)
                     
-                    // Stage Preview (like MadMapper's input preview)
                     VStack {
                         HStack {
-                            Text("Stage")
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.5))
+                            Text("STAGE")
+                                .font(.system(.caption2, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.4))
                             Spacer()
                             Text(vm.currentInputSource)
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.5))
+                                .font(.system(.caption2, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.4))
                         }
                         .padding(8)
                         
@@ -352,31 +394,33 @@ struct ControlPanel: View {
     }
 }
 
+// Supporting Views (LayerRow, LayerProperties, MeshEditor, etc. - keeping previous implementations)
 struct LayerRow: View {
     let layer: Layer
     let isSelected: Bool
     let onSelect: () -> Void
     
     var body: some View {
-        HStack {
+        HStack(spacing: 6) {
             Image(systemName: layer.type == .video ? "video.fill" : "scissors")
                 .foregroundColor(layer.type == .video ? .blue : .orange)
-                .frame(width: 20)
+                .frame(width: 16)
+                .font(.caption)
             
             Text(layer.name)
-                .font(.system(.body, design: .monospaced))
+                .font(.system(.caption, design: .monospaced))
             
             Spacer()
             
             if !layer.isVisible {
                 Image(systemName: "eye.slash")
                     .foregroundColor(.gray)
-                    .font(.caption)
+                    .font(.caption2)
             }
         }
-        .padding(8)
+        .padding(6)
         .background(isSelected ? Color.accentColor.opacity(0.3) : Color.clear)
-        .cornerRadius(4)
+        .cornerRadius(3)
         .onTapGesture { onSelect() }
     }
 }
@@ -390,51 +434,51 @@ struct LayerProperties: View {
     @State private var gridCols = 3
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Properties").font(.headline)
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Properties").font(.caption).bold()
             
-            TextField("Name", text: $layer.name)
+            TextField("", text: $layer.name)
                 .textFieldStyle(.roundedBorder)
+                .font(.caption)
                 .onChange(of: layer.name) { _ in onUpdate() }
             
             Toggle("Visible", isOn: $layer.isVisible)
+                .font(.caption)
                 .onChange(of: layer.isVisible) { _ in onUpdate() }
             
             if layer.type == .video {
-                VStack(alignment: .leading) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("Opacity: \(Int(layer.opacity * 100))%")
-                        .font(.caption)
+                        .font(.caption2)
                     Slider(value: $layer.opacity, in: 0...1)
                         .onChange(of: layer.opacity) { _ in onUpdate() }
                 }
                 
-                VStack(alignment: .leading) {
-                    Text("Edge Blend: \(Int(layer.edgeSoftness * 100))%")
-                        .font(.caption)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Edge: \(Int(layer.edgeSoftness * 100))%")
+                        .font(.caption2)
                     Slider(value: $layer.edgeSoftness, in: 0...0.5)
                         .onChange(of: layer.edgeSoftness) { _ in onUpdate() }
                 }
                 
-                Divider()
-                
-                Text("Mesh").font(.subheadline).bold()
-                Text("Current: \(layer.rows)×\(layer.cols)")
-                    .font(.caption)
+                Text("Mesh: \(layer.rows)×\(layer.cols)")
+                    .font(.caption2)
                     .foregroundColor(.secondary)
                 
-                HStack {
-                    Stepper("Rows: \(gridRows)", value: $gridRows, in: 2...10)
-                    Stepper("Cols: \(gridCols)", value: $gridCols, in: 2...10)
+                HStack(spacing: 4) {
+                    Stepper("R:\(gridRows)", value: $gridRows, in: 2...10)
+                        .font(.caption2)
+                    Stepper("C:\(gridCols)", value: $gridCols, in: 2...10)
+                        .font(.caption2)
                 }
-                .font(.caption)
                 
-                Button("Convert to \(gridRows)×\(gridCols) Grid") {
+                Button("Convert") {
                     onConvertToGrid(gridRows, gridCols)
                 }
                 .buttonStyle(.bordered)
+                .font(.caption2)
             }
         }
-        .padding(.vertical)
     }
 }
 
@@ -445,7 +489,6 @@ struct MeshEditor: View {
     
     var body: some View {
         ZStack {
-            // Draw mesh lines
             if layer.type == .video && layer.rows > 0 && layer.cols > 0 {
                 MeshLines(layer: layer, canvasSize: canvasSize)
                     .stroke(Color.cyan.opacity(0.5), lineWidth: 1)
@@ -454,7 +497,6 @@ struct MeshEditor: View {
                     .stroke(Color.orange, lineWidth: 2)
             }
             
-            // Draw control points
             ForEach(0..<layer.controlPoints.count, id: \.self) { index in
                 ControlPointHandle(
                     position: layer.controlPoints[index],
@@ -475,11 +517,9 @@ struct MeshLines: Shape {
     
     func path(in rect: CGRect) -> Path {
         var path = Path()
-        
         let w = canvasSize.width
         let h = canvasSize.height
         
-        // Horizontal lines
         for r in 0..<layer.rows {
             for c in 0..<(layer.cols - 1) {
                 let p1 = toScreen(layer.controlPoints[r * layer.cols + c], w, h)
@@ -489,7 +529,6 @@ struct MeshLines: Shape {
             }
         }
         
-        // Vertical lines
         for c in 0..<layer.cols {
             for r in 0..<(layer.rows - 1) {
                 let p1 = toScreen(layer.controlPoints[r * layer.cols + c], w, h)
@@ -514,7 +553,6 @@ struct MaskOutline: Shape {
     
     func path(in rect: CGRect) -> Path {
         var path = Path()
-        
         let w = canvasSize.width
         let h = canvasSize.height
         
@@ -529,7 +567,6 @@ struct MaskOutline: Shape {
         }
         
         path.closeSubpath()
-        
         return path
     }
     
@@ -548,7 +585,7 @@ struct ControlPointHandle: View {
     var body: some View {
         Circle()
             .fill(color)
-            .frame(width: 10, height: 10)
+            .frame(width: 8, height: 8)
             .overlay(Circle().stroke(Color.black, lineWidth: 1))
             .position(toScreen(position))
             .gesture(
