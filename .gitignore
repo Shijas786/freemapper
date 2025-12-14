@@ -3,5 +3,8 @@
 .swiftpm
 .build/
 *.xcodeproj
+*.xcworkspace
 xcuserdata/
 DerivedData/
+*.xcodeproj/
+.idea/

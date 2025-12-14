@@ -16,6 +16,9 @@ let package = Package(
             path: "Sources",
             resources: [
                 .process("Renderer/Shaders.metal")
+            ],
+            swiftSettings: [
+                .unsafeFlags(["-parse-as-library"])
             ]
         )
     ]
